@@ -1,0 +1,23 @@
+{
+  "slug": "lowe-seq",
+  "name": "lowe-seq",
+  "version": "1.0.0",
+  "license": "proprietary",
+  "brand": "lowe-seq",
+  "author": "Lowe Hornvall",
+  "authorEmail": "",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "MyModule",
+      "name": "MyModule",
+      "description": "",
+      "tags": []
+    }
+  ]
+}
