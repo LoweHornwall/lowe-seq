@@ -52,8 +52,8 @@ struct ChanceSeq : Module {
 		configParam(CLOCK_PARAM, -2.f, 6.f, 2.f, "Clock tempo", " bpm", 2.f, 60.f);
 		configParam(RUN_PARAM, 0.f, 1.f, 0.f);
 		configParam(RESET_PARAM, 0.f, 1.f, 0.f);
-		configParam(STEPS_PARAM, 1.f, 8.f, 8.f);
-		for (int i = 0; i < 8; i++) {
+		configParam(STEPS_PARAM, 1.f, 16.f, 16.f);
+		for (int i = 0; i < 16; i++) {
 			configParam(ROW1_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW2_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW3_PARAM + i, 0.f, 10.f, 0.f);
@@ -84,7 +84,7 @@ struct ChanceSeq : Module {
 
 		// gates
 		json_t* gatesJ = json_array();
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < 16; i++) {
 			json_array_insert_new(gatesJ, i, json_integer((int) gates[i]));
 		}
 		json_object_set_new(rootJ, "gates", gatesJ);
@@ -101,7 +101,7 @@ struct ChanceSeq : Module {
 		// gates
 		json_t* gatesJ = json_object_get(rootJ, "gates");
 		if (gatesJ) {
-			for (int i = 0; i < 8; i++) {
+			for (int i = 0; i < 16; i++) {
 				json_t* gateJ = json_array_get(gatesJ, i);
 				if (gateJ)
 					gates[i] = !!json_integer_value(gateJ);
@@ -110,7 +110,7 @@ struct ChanceSeq : Module {
 	}
 
 	void setIndex(int index) {
-		int numSteps = (int) clamp(std::round(params[STEPS_PARAM].getValue() + inputs[STEPS_INPUT].getVoltage()), 1.f, 8.f);
+		int numSteps = (int) clamp(std::round(params[STEPS_PARAM].getValue() + inputs[STEPS_INPUT].getVoltage()), 1.f, 16.f);
 		phase = 0.f;
 		this->index = index;
 		if (this->index >= numSteps)
@@ -149,7 +149,7 @@ struct ChanceSeq : Module {
 		}
 
 		// Gate buttons
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < 16; i++) {
 			if (gateTriggers[i].process(params[GATE_PARAM + i].getValue())) {
 				gates[i] = !gates[i];
 			}
@@ -176,11 +176,6 @@ struct ChanceSeqWidget : ModuleWidget {
 	ChanceSeqWidget(ChanceSeq* module) {
 		setModule(module);
 		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ChanceSeq.svg")));
-
-		addChild(createWidget<ScrewSilver>(Vec(15, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 30, 0)));
-		addChild(createWidget<ScrewSilver>(Vec(15, 365)));
-		addChild(createWidget<ScrewSilver>(Vec(box.size.x - 30, 365)));
 
 		addParam(createParam<RoundBlackKnob>(Vec(18, 56), module, ChanceSeq::CLOCK_PARAM));
 		addParam(createParam<LEDButton>(Vec(60, 61 - 1), module, ChanceSeq::RUN_PARAM));
