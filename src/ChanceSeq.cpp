@@ -7,10 +7,10 @@ struct ChanceSeq : Module {
 		RUN_PARAM,
 		RESET_PARAM,
 		STEPS_PARAM,
-		ENUMS(ROW1_PARAM, 8),
-		ENUMS(ROW2_PARAM, 8),
-		ENUMS(ROW3_PARAM, 8),
-		ENUMS(GATE_PARAM, 8),
+		ENUMS(ROW1_PARAM, 16),
+		ENUMS(ROW2_PARAM, 16),
+		ENUMS(ROW3_PARAM, 16),
+		ENUMS(GATE_PARAM, 16),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -25,7 +25,7 @@ struct ChanceSeq : Module {
 		ROW1_OUTPUT,
 		ROW2_OUTPUT,
 		ROW3_OUTPUT,
-		ENUMS(GATE_OUTPUT, 8),
+		ENUMS(GATE_OUTPUT, 16),
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -33,7 +33,7 @@ struct ChanceSeq : Module {
 		RESET_LIGHT,
 		GATES_LIGHT,
 		ENUMS(ROW_LIGHTS, 3),
-		ENUMS(GATE_LIGHTS, 8),
+		ENUMS(GATE_LIGHTS, 16),
 		NUM_LIGHTS
 	};
 
@@ -41,11 +41,11 @@ struct ChanceSeq : Module {
 	dsp::SchmittTrigger clockTrigger;
 	dsp::SchmittTrigger runningTrigger;
 	dsp::SchmittTrigger resetTrigger;
-	dsp::SchmittTrigger gateTriggers[8];
+	dsp::SchmittTrigger gateTriggers[16];
 	/** Phase of internal LFO */
 	float phase = 0.f;
 	int index = 0;
-	bool gates[8] = {};
+	bool gates[16] = {};
 
 	ChanceSeq() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
@@ -193,7 +193,7 @@ struct ChanceSeqWidget : ModuleWidget {
 		addChild(createLight<MediumLight<GreenLight>>(Vec(256.4f, 64.4f), module, ChanceSeq::ROW_LIGHTS + 1));
 		addChild(createLight<MediumLight<GreenLight>>(Vec(295.4f, 64.4f), module, ChanceSeq::ROW_LIGHTS + 2));
 
-		static const float portX[8] = {20, 58, 96, 135, 173, 212, 250, 289};
+		static const float portX[16] = {20, 58, 96, 134, 172, 210, 248, 286, 324, 362, 400, 438, 476, 514, 552, 590};
 		addInput(createInput<PJ301MPort>(Vec(portX[0] - 1, 98), module, ChanceSeq::CLOCK_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[1] - 1, 98), module, ChanceSeq::EXT_CLOCK_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[2] - 1, 98), module, ChanceSeq::RESET_INPUT));
@@ -203,7 +203,7 @@ struct ChanceSeqWidget : ModuleWidget {
 		addOutput(createOutput<PJ301MPort>(Vec(portX[6] - 1, 98), module, ChanceSeq::ROW2_OUTPUT));
 		addOutput(createOutput<PJ301MPort>(Vec(portX[7] - 1, 98), module, ChanceSeq::ROW3_OUTPUT));
 
-		for (int i = 0; i < 8; i++) {
+		for (int i = 0; i < 16; i++) {
 			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 157), module, ChanceSeq::ROW1_PARAM + i));
 			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 198), module, ChanceSeq::ROW2_PARAM + i));
 			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 240), module, ChanceSeq::ROW3_PARAM + i));
