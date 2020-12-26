@@ -18,6 +18,12 @@
       "name": "MyModule",
       "description": "",
       "tags": []
+    },
+    {
+      "slug": "ChanceSeq",
+      "name": "ChanceSeq",
+      "description": "",
+      "tags": []
     }
   ]
 }
