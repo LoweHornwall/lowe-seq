@@ -20,7 +20,7 @@ struct ChanceSeq : Module {
 		ENUMS(ROW2_CHANCE_PITCH_PARAM, 16),
 		ENUMS(ROW3_CHANCE_PITCH_PARAM, 16),
 		ENUMS(ROW4_CHANCE_PITCH_PARAM, 16),
-		ENUMS(GATE_PARAM, 16),
+		ENUMS(TRIGGER_PARAM, 16),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -30,8 +30,6 @@ struct ChanceSeq : Module {
 		NUM_INPUTS
 	};
 	enum OutputIds {
-		GATES_OUTPUT,
-		TRIGGER_OUTPUT,
 		ROW1_OUTPUT,
 		ROW2_OUTPUT,
 		ROW3_OUTPUT,
@@ -44,7 +42,7 @@ struct ChanceSeq : Module {
 		ROW2_TRIGGER_OUTPUT,
 		ROW3_TRIGGER_OUTPUT,
 		ROW4_TRIGGER_OUTPUT,
-		ENUMS(GATE_OUTPUT, 16),
+		ENUMS(TRIGGER_OUTPUT, 16),
 		NUM_OUTPUTS
 	};
 	enum LightIds {
@@ -52,7 +50,7 @@ struct ChanceSeq : Module {
 		RESET_LIGHT,
 		GATES_LIGHT,
 		ENUMS(ROW_LIGHTS, 4),
-		ENUMS(GATE_LIGHTS, 16),
+		ENUMS(TRIGGER_LIGHTS, 16),
 		NUM_LIGHTS
 	};
 
@@ -64,7 +62,6 @@ struct ChanceSeq : Module {
 	/** Phase of internal LFO */
 	float phase = 0.f;
 	int index = 0;
-	bool gates[16] = {};
 
 	/** for chance gate knobs */
 	bool coinFlip[4] = {false, false, false, false};
@@ -90,22 +87,16 @@ struct ChanceSeq : Module {
 			configParam(ROW2_CHANCE_PITCH_PARAM + i, -1.f, 1.f, 0.f);
 			configParam(ROW3_CHANCE_PITCH_PARAM + i, -1.f, 1.f, 0.f);
 			configParam(ROW4_CHANCE_PITCH_PARAM + i, -1.f, 1.f, 0.f);
-			configParam(GATE_PARAM + i, 0.f, 1.f, 0.f);
+			configParam(TRIGGER_PARAM + i, 0.f, 1.f, 0.f);
 		}
 
 		onReset();
 	}
 
 	void onReset() override {
-		for (int i = 0; i < 16; i++) {
-			gates[i] = true;
-		}
 	}
 
 	void onRandomize() override {
-		for (int i = 0; i < 16; i++) {
-			gates[i] = (random::uniform() > 0.5f);
-		}
 	}
 
 	json_t* dataToJson() override {
@@ -113,13 +104,6 @@ struct ChanceSeq : Module {
 
 		// running
 		json_object_set_new(rootJ, "running", json_boolean(running));
-
-		// gates
-		json_t* gatesJ = json_array();
-		for (int i = 0; i < 16; i++) {
-			json_array_insert_new(gatesJ, i, json_integer((int) gates[i]));
-		}
-		json_object_set_new(rootJ, "gates", gatesJ);
 
 		return rootJ;
 	}
@@ -129,16 +113,6 @@ struct ChanceSeq : Module {
 		json_t* runningJ = json_object_get(rootJ, "running");
 		if (runningJ)
 			running = json_is_true(runningJ);
-
-		// gates
-		json_t* gatesJ = json_object_get(rootJ, "gates");
-		if (gatesJ) {
-			for (int i = 0; i < 16; i++) {
-				json_t* gateJ = json_array_get(gatesJ, i);
-				if (gateJ)
-					gates[i] = !!json_integer_value(gateJ);
-			}
-		}
 	}
 
 	void setIndex(int index) {
@@ -157,27 +131,28 @@ struct ChanceSeq : Module {
 
 		bool gateIn = false;
 		bool trigIn = false;
+		bool triggerButtonHeld = false;
+		// TRIGGER buttons
+		for (int i = 0; i < 16; i++) {
+			// trigger if a button is pressed
+			if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
+				trigIn = true;
+
+			if (params[TRIGGER_PARAM + i].getValue() == 1) {
+				setIndex(i);
+				triggerButtonHeld = true;
+			}
+		}
+
 		if (running) {
 			if (inputs[EXT_CLOCK_INPUT].isConnected()) {
-				// External clock, Stuff within block called when triggered
-				if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage())) {
+				/**
+				 * External clock, Stuff within block called when triggered. Don't call when trigger button is held
+				 * to avoid occasional double triggers due to unlucky timings
+				 */
+				if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !triggerButtonHeld) {
 					setIndex(index + 1);
 					trigIn = true;
-
-					coinFlip[0] = random::uniform() < params[ROW1_CHANCE_GATE_PARAM + index].getValue();
-					coinFlip[1] = random::uniform() < params[ROW2_CHANCE_GATE_PARAM + index].getValue();
-					coinFlip[2] = random::uniform() < params[ROW3_CHANCE_GATE_PARAM + index].getValue();
-					coinFlip[3] = random::uniform() < params[ROW4_CHANCE_GATE_PARAM + index].getValue();
-					// std::cout << random::uniform();
-					// std::cout << "\n";
-
-					pitchShift[0] = random::uniform() * params[ROW1_CHANCE_PITCH_PARAM + index].getValue();
-					pitchShift[1] = random::uniform() * params[ROW2_CHANCE_PITCH_PARAM + index].getValue();
-					pitchShift[2] = random::uniform() * params[ROW3_CHANCE_PITCH_PARAM + index].getValue();
-					pitchShift[3] = random::uniform() * params[ROW4_CHANCE_PITCH_PARAM + index].getValue();
-
-					// std::cout << pitchShift[0];
-					// std::cout << "\n";
 				}
 				gateIn = clockTrigger.isHigh();
 			}
@@ -188,31 +163,47 @@ struct ChanceSeq : Module {
 			setIndex(0);
 		}
 
-		// Gate buttons
+
+
+		// randomize values based on params if triggered
+		if (trigIn) {
+			coinFlip[0] = random::uniform() < params[ROW1_CHANCE_GATE_PARAM + index].getValue();
+			coinFlip[1] = random::uniform() < params[ROW2_CHANCE_GATE_PARAM + index].getValue();
+			coinFlip[2] = random::uniform() < params[ROW3_CHANCE_GATE_PARAM + index].getValue();
+			coinFlip[3] = random::uniform() < params[ROW4_CHANCE_GATE_PARAM + index].getValue();
+			// std::cout << random::uniform();
+			// std::cout << "\n";
+
+			pitchShift[0] = random::uniform() * params[ROW1_CHANCE_PITCH_PARAM + index].getValue();
+			pitchShift[1] = random::uniform() * params[ROW2_CHANCE_PITCH_PARAM + index].getValue();
+			pitchShift[2] = random::uniform() * params[ROW3_CHANCE_PITCH_PARAM + index].getValue();
+			pitchShift[3] = random::uniform() * params[ROW4_CHANCE_PITCH_PARAM + index].getValue();
+
+			// std::cout << pitchShift[0];
+			// std::cout << "\n";
+		}
+
 		for (int i = 0; i < 16; i++) {
-			if (gateTriggers[i].process(params[GATE_PARAM + i].getValue())) {
-				gates[i] = !gates[i];
-			}
-			outputs[GATE_OUTPUT + i].setVoltage((running && gateIn && i == index && gates[i]) ? 10.f : 0.f);
-			lights[GATE_LIGHTS + i].setSmoothBrightness((gateIn && i == index) ? (gates[i] ? 1.f : 0.12) : (gates[i] ? 0.25 : 0.0), args.sampleTime);
+			outputs[TRIGGER_OUTPUT + i].setVoltage((running && trigIn && i == index) ? 10.f : 0.f);
+			lights[TRIGGER_LIGHTS + i].setSmoothBrightness((i == index) ? 1.f : 0.f, args.sampleTime);
 		}
 
 		// Outputs
 		outputs[ROW1_OUTPUT].setVoltage(params[ROW1_PARAM + index].getValue() + pitchShift[0]);
-		outputs[ROW1_GATE_OUTPUT].setVoltage((gateIn && gates[index] && coinFlip[0]) ? 10.f : 0.f);
-		outputs[ROW1_TRIGGER_OUTPUT].setVoltage((trigIn && gates[index] && coinFlip[0]) ? 10.f : 0.f);
+		outputs[ROW1_GATE_OUTPUT].setVoltage((gateIn && coinFlip[0]) ? 10.f : 0.f);
+		outputs[ROW1_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[0]) ? 10.f : 0.f);
 
 		outputs[ROW2_OUTPUT].setVoltage(params[ROW2_PARAM + index].getValue() + pitchShift[1]);
-		outputs[ROW2_GATE_OUTPUT].setVoltage((gateIn && gates[index] && coinFlip[1]) ? 10.f : 0.f);
-		outputs[ROW2_TRIGGER_OUTPUT].setVoltage((trigIn && gates[index] && coinFlip[1]) ? 10.f : 0.f);
+		outputs[ROW2_GATE_OUTPUT].setVoltage((gateIn && coinFlip[1]) ? 10.f : 0.f);
+		outputs[ROW2_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[1]) ? 10.f : 0.f);
 
 		outputs[ROW3_OUTPUT].setVoltage(params[ROW3_PARAM + index].getValue() + pitchShift[2]);
-		outputs[ROW3_GATE_OUTPUT].setVoltage((gateIn && gates[index] && coinFlip[2]) ? 10.f : 0.f);
-		outputs[ROW3_TRIGGER_OUTPUT].setVoltage((trigIn && gates[index] && coinFlip[2]) ? 10.f : 0.f);
+		outputs[ROW3_GATE_OUTPUT].setVoltage((gateIn && coinFlip[2]) ? 10.f : 0.f);
+		outputs[ROW3_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[2]) ? 10.f : 0.f);
 
 		outputs[ROW4_OUTPUT].setVoltage(params[ROW4_PARAM + index].getValue() + pitchShift[3]);
-		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && gates[index] && coinFlip[3]) ? 10.f : 0.f);
-		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && gates[index] && coinFlip[3]) ? 10.f : 0.f);
+		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && coinFlip[3]) ? 10.f : 0.f);
+		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[3]) ? 10.f : 0.f);
 
 		lights[RUNNING_LIGHT].value = (running);
 		lights[RESET_LIGHT].setSmoothBrightness(resetTrigger.isHigh(), args.sampleTime);
@@ -236,8 +227,6 @@ struct ChanceSeqWidget : ModuleWidget {
 		addInput(createInput<PJ301MPort>(Vec(portX[1] - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[2] - 1, 70), module, ChanceSeq::RESET_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[3] - 1, 70), module, ChanceSeq::STEPS_INPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[4] - 1, 70), module, ChanceSeq::GATES_OUTPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[5] - 1, 70), module, ChanceSeq::TRIGGER_OUTPUT));
 
 		for (int i = 0; i < 16; i++) {
 			addParam(createParam<ChanceGateKnob>(Vec(portX[i] + 12, 100), module, ChanceSeq::ROW1_CHANCE_GATE_PARAM + i));
@@ -256,9 +245,9 @@ struct ChanceSeqWidget : ModuleWidget {
 			addParam(createParam<ChancePitchKnob>(Vec(portX[i] + 28.5f, 265), module, ChanceSeq::ROW4_CHANCE_PITCH_PARAM + i));
 			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 270), module, ChanceSeq::ROW4_PARAM + i));
 
-			addParam(createParam<LEDButton>(Vec(portX[i] + 2.5f, 320 - 1), module, ChanceSeq::GATE_PARAM + i));
-			addChild(createLight<MediumLight<BlueLight>>(Vec(portX[i] + 6.9f, 323.4f), module, ChanceSeq::GATE_LIGHTS + i));
-			addOutput(createOutput<PJ301MPort>(Vec(portX[i] - 1.5f, 349), module, ChanceSeq::GATE_OUTPUT + i));
+			addParam(createParam<CKD6>(Vec(portX[i] - 2, 310), module, ChanceSeq::TRIGGER_PARAM + i));
+			addChild(createLight<LargeLight<BlueLight>>(Vec(portX[i] + 4.5f, 316), module, ChanceSeq::TRIGGER_LIGHTS + i));
+			addOutput(createOutput<PJ301MPort>(Vec(portX[i] - 1.f, 349), module, ChanceSeq::TRIGGER_OUTPUT + i));
 		}
 
 		addOutput(createOutput<PJ301MPort>(Vec(830, 120), module, ChanceSeq::ROW1_OUTPUT));
