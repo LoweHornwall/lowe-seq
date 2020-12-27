@@ -7,9 +7,9 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="254mm"
+   width="355.60001mm"
    height="128.5mm"
-   viewBox="0 0 254 128.50001"
+   viewBox="0 0 355.60001 128.50001"
    version="1.1"
    id="svg12553"
    inkscape:version="1.0.1 (3bc2e813f5, 2020-09-07)"
@@ -24,8 +24,8 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.4"
-     inkscape:cx="415.30177"
-     inkscape:cy="125.27209"
+     inkscape:cx="541.69364"
+     inkscape:cy="-23.424223"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="true"
@@ -56,7 +56,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -68,8 +68,8 @@
     <path
        inkscape:connector-curvature="0"
        id="path33453"
-       d="M 26.543497,161.30654 H 280.5435 v 128.5 H 26.543497 Z m 0,0"
-       style="fill:#e6e6e6;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.532666" />
+       d="M 26.543497,161.30654 H 382.1435 v 128.5 H 26.543497 Z m 0,0"
+       style="fill:#e6e6e6;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.630259" />
     <g
        aria-label="Clock "
        id="text354"

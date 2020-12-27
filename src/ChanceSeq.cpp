@@ -11,6 +11,10 @@ struct ChanceSeq : Module {
 		ENUMS(ROW2_PARAM, 16),
 		ENUMS(ROW3_PARAM, 16),
 		ENUMS(ROW4_PARAM, 16),
+		ENUMS(ROW1_CHANCE_PARAM, 16),
+		ENUMS(ROW2_CHANCE_PARAM, 16),
+		ENUMS(ROW3_CHANCE_PARAM, 16),
+		ENUMS(ROW4_CHANCE_PARAM, 16),
 		ENUMS(GATE_PARAM, 16),
 		NUM_PARAMS
 	};
@@ -27,6 +31,14 @@ struct ChanceSeq : Module {
 		ROW2_OUTPUT,
 		ROW3_OUTPUT,
 		ROW4_OUTPUT,
+		ROW1_GATE_OUTPUT,
+		ROW2_GATE_OUTPUT,
+		ROW3_GATE_OUTPUT,
+		ROW4_GATE_OUTPUT,
+		ROW1_TRIGGER_OUTPUT,
+		ROW2_TRIGGER_OUTPUT,
+		ROW3_TRIGGER_OUTPUT,
+		ROW4_TRIGGER_OUTPUT,
 		ENUMS(GATE_OUTPUT, 16),
 		NUM_OUTPUTS
 	};
@@ -62,6 +74,10 @@ struct ChanceSeq : Module {
 			configParam(ROW2_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW3_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW4_PARAM + i, 0.f, 10.f, 0.f);
+			configParam(ROW1_CHANCE_PARAM + i, 0.f, 1.f, 1.f);
+			configParam(ROW2_CHANCE_PARAM + i, 0.f, 1.f, 1.f);
+			configParam(ROW3_CHANCE_PARAM + i, 0.f, 1.f, 1.f);
+			configParam(ROW4_CHANCE_PARAM + i, 0.f, 1.f, 1.f);
 			configParam(GATE_PARAM + i, 0.f, 1.f, 0.f);
 		}
 
@@ -135,7 +151,7 @@ struct ChanceSeq : Module {
 				if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage())) {
 					setIndex(index + 1);
 					trigIn = true;
-					coinFlip = random::uniform() < 0.5;
+					coinFlip = random::uniform() < params[ROW1_CHANCE_PARAM + index].getValue();
 				}
 				gateIn = clockTrigger.isHigh();
 			}
@@ -165,10 +181,6 @@ struct ChanceSeq : Module {
 		lights[RUNNING_LIGHT].value = (running);
 		lights[RESET_LIGHT].setSmoothBrightness(resetTrigger.isHigh(), args.sampleTime);
 		lights[GATES_LIGHT].setSmoothBrightness(gateIn, args.sampleTime);
-		lights[ROW_LIGHTS].value = outputs[ROW1_OUTPUT].value / 10.f;
-		lights[ROW_LIGHTS + 1].value = outputs[ROW2_OUTPUT].value / 10.f;
-		lights[ROW_LIGHTS + 2].value = outputs[ROW3_OUTPUT].value / 10.f;
-		lights[ROW_LIGHTS + 3].value = outputs[ROW4_OUTPUT].value / 10.f;
 	}
 };
 
@@ -178,38 +190,55 @@ struct ChanceSeqWidget : ModuleWidget {
 		setModule(module);
 		setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ChanceSeq.svg")));
 
-		static const float portX[16] = {20, 65, 110, 155, 200, 245, 290, 335, 380, 425, 470, 515, 560, 605, 650, 695};
+		static const float portX[16] = {20, 70, 120, 170, 220, 270, 320, 370, 420, 470, 520, 570, 620, 670, 720, 770};
 
 		addParam(createParam<LEDButton>(Vec(portX[1], 47 - 1), module, ChanceSeq::RUN_PARAM));
 		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[2], 50.4f), module, ChanceSeq::RUNNING_LIGHT));
 		addParam(createParam<LEDButton>(Vec(portX[3], 47 - 1), module, ChanceSeq::RESET_PARAM));
 		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[4], 50.4f), module, ChanceSeq::RESET_LIGHT));
 		addParam(createParam<RoundBlackSnapKnob>(Vec(portX[5], 38), module, ChanceSeq::STEPS_PARAM));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[6], 50.4f), module, ChanceSeq::GATES_LIGHT));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[7], 50.4f), module, ChanceSeq::ROW_LIGHTS));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[8], 50.4f), module, ChanceSeq::ROW_LIGHTS + 1));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[9], 50.4f), module, ChanceSeq::ROW_LIGHTS + 2));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[10], 50.4f), module, ChanceSeq::ROW_LIGHTS + 3));
 
 		addInput(createInput<PJ301MPort>(Vec(portX[1] - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[2] - 1, 70), module, ChanceSeq::RESET_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(portX[3] - 1, 70), module, ChanceSeq::STEPS_INPUT));
 		addOutput(createOutput<PJ301MPort>(Vec(portX[4] - 1, 70), module, ChanceSeq::GATES_OUTPUT));
 		addOutput(createOutput<PJ301MPort>(Vec(portX[5] - 1, 70), module, ChanceSeq::TRIGGER_OUTPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[6] - 1, 70), module, ChanceSeq::ROW1_OUTPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[7] - 1, 70), module, ChanceSeq::ROW2_OUTPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[8] - 1, 70), module, ChanceSeq::ROW3_OUTPUT));
-		addOutput(createOutput<PJ301MPort>(Vec(portX[9] - 1, 70), module, ChanceSeq::ROW4_OUTPUT));
 
 		for (int i = 0; i < 16; i++) {
-			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 120), module, ChanceSeq::ROW1_PARAM + i));
-			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 170), module, ChanceSeq::ROW2_PARAM + i));
-			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 220), module, ChanceSeq::ROW3_PARAM + i));
-			addParam(createParam<RoundBlackKnob>(Vec(portX[i] - 2, 270), module, ChanceSeq::ROW4_PARAM + i));
-			addParam(createParam<LEDButton>(Vec(portX[i] + 2, 320 - 1), module, ChanceSeq::GATE_PARAM + i));
-			addChild(createLight<MediumLight<BlueLight>>(Vec(portX[i] + 6.4f, 323.4f), module, ChanceSeq::GATE_LIGHTS + i));
-			addOutput(createOutput<PJ301MPort>(Vec(portX[i] - 1, 349), module, ChanceSeq::GATE_OUTPUT + i));
+			addParam(createParam<ChanceKnob>(Vec(portX[i] + 20, 105), module, ChanceSeq::ROW1_CHANCE_PARAM + i));
+			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 120), module, ChanceSeq::ROW1_PARAM + i));
+
+			addParam(createParam<ChanceKnob>(Vec(portX[i] + 20, 155), module, ChanceSeq::ROW2_CHANCE_PARAM + i));
+			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 170), module, ChanceSeq::ROW2_PARAM + i));
+
+			addParam(createParam<ChanceKnob>(Vec(portX[i] + 20, 205), module, ChanceSeq::ROW3_CHANCE_PARAM + i));
+			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 220), module, ChanceSeq::ROW3_PARAM + i));
+
+			addParam(createParam<ChanceKnob>(Vec(portX[i] + 20, 255), module, ChanceSeq::ROW4_CHANCE_PARAM + i));
+			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 270), module, ChanceSeq::ROW4_PARAM + i));
+
+			addParam(createParam<LEDButton>(Vec(portX[i] + 2.5f, 320 - 1), module, ChanceSeq::GATE_PARAM + i));
+			addChild(createLight<MediumLight<BlueLight>>(Vec(portX[i] + 6.9f, 323.4f), module, ChanceSeq::GATE_LIGHTS + i));
+			addOutput(createOutput<PJ301MPort>(Vec(portX[i] - 1.5f, 349), module, ChanceSeq::GATE_OUTPUT + i));
 		}
+
+		addOutput(createOutput<PJ301MPort>(Vec(830, 120), module, ChanceSeq::ROW1_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(880, 120), module, ChanceSeq::ROW1_GATE_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(930, 120), module, ChanceSeq::ROW1_TRIGGER_OUTPUT));
+
+		addOutput(createOutput<PJ301MPort>(Vec(830, 170), module, ChanceSeq::ROW2_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(880, 170), module, ChanceSeq::ROW2_GATE_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(930, 170), module, ChanceSeq::ROW2_TRIGGER_OUTPUT));
+
+		addOutput(createOutput<PJ301MPort>(Vec(830, 220), module, ChanceSeq::ROW3_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(880, 220), module, ChanceSeq::ROW3_GATE_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(930, 220), module, ChanceSeq::ROW3_TRIGGER_OUTPUT));
+
+		addOutput(createOutput<PJ301MPort>(Vec(830, 270), module, ChanceSeq::ROW4_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(880, 270), module, ChanceSeq::ROW4_GATE_OUTPUT));
+		addOutput(createOutput<PJ301MPort>(Vec(930, 270), module, ChanceSeq::ROW4_TRIGGER_OUTPUT));
+
+		// addOutput(createOutput(<PJ301MPort>(oi)))
 	}
 };
 
