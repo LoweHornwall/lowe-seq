@@ -8,6 +8,6 @@ struct PitchKnob : SVGKnob {
     PitchKnob();
 };
 
-struct ChanceKnob : SVGKnob {
-    ChanceKnob();
+struct ChanceGateKnob : SVGKnob {
+    ChanceGateKnob();
 };
