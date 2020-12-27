@@ -11,3 +11,7 @@ struct PitchKnob : SVGKnob {
 struct ChanceGateKnob : SVGKnob {
     ChanceGateKnob();
 };
+
+struct ChancePitchKnob : SVGKnob {
+    ChancePitchKnob();
+};
