@@ -27,6 +27,7 @@ struct ChanceSeq : Module {
 		EXT_CLOCK_INPUT,
 		RESET_INPUT,
 		STEPS_INPUT,
+		ENUMS(TRIGGER_INPUT, 16),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -46,7 +47,6 @@ struct ChanceSeq : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		RUNNING_LIGHT,
 		RESET_LIGHT,
 		GATES_LIGHT,
 		ENUMS(ROW_LIGHTS, 4),
@@ -54,11 +54,10 @@ struct ChanceSeq : Module {
 		NUM_LIGHTS
 	};
 
-	bool running = true;
 	dsp::SchmittTrigger clockTrigger;
-	dsp::SchmittTrigger runningTrigger;
 	dsp::SchmittTrigger resetTrigger;
 	dsp::SchmittTrigger gateTriggers[16];
+	dsp::SchmittTrigger gateInputTriggers[16];
 	/** Phase of internal LFO */
 	float phase = 0.f;
 	int index = 0;
@@ -102,17 +101,10 @@ struct ChanceSeq : Module {
 	json_t* dataToJson() override {
 		json_t* rootJ = json_object();
 
-		// running
-		json_object_set_new(rootJ, "running", json_boolean(running));
-
 		return rootJ;
 	}
 
 	void dataFromJson(json_t* rootJ) override {
-		// running
-		json_t* runningJ = json_object_get(rootJ, "running");
-		if (runningJ)
-			running = json_is_true(runningJ);
 	}
 
 	void setIndex(int index) {
@@ -124,14 +116,25 @@ struct ChanceSeq : Module {
 	}
 
 	void process(const ProcessArgs& args) override {
-		// Run
-		if (runningTrigger.process(params[RUN_PARAM].getValue())) {
-			running = !running;
-		}
-
 		bool gateIn = false;
 		bool trigIn = false;
-		bool triggerButtonHeld = false;
+		bool triggerHeld = false;
+
+		// TRIGGER inputs
+		for (int i = 0; i < 16; i++) {
+			if (inputs[TRIGGER_INPUT + i].isConnected() && gateInputTriggers[i].process(inputs[TRIGGER_INPUT + i].getVoltage()))
+				trigIn = true;
+
+			// If value is different from the one before then trigger
+			if (inputs[TRIGGER_INPUT + i].getVoltage() > 0.f) {
+				if (index != i)
+					trigIn = true;
+
+				setIndex(i);
+				triggerHeld = true;
+			}
+		}
+
 		// TRIGGER buttons
 		for (int i = 0; i < 16; i++) {
 			// trigger if a button is pressed
@@ -140,30 +143,27 @@ struct ChanceSeq : Module {
 
 			if (params[TRIGGER_PARAM + i].getValue() == 1) {
 				setIndex(i);
-				triggerButtonHeld = true;
+				triggerHeld = true;
 			}
 		}
 
-		if (running) {
-			if (inputs[EXT_CLOCK_INPUT].isConnected()) {
-				/**
-				 * External clock, Stuff within block called when triggered. Don't call when trigger button is held
-				 * to avoid occasional double triggers due to unlucky timings
-				 */
-				if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !triggerButtonHeld) {
-					setIndex(index + 1);
-					trigIn = true;
-				}
-				gateIn = clockTrigger.isHigh();
+		if (inputs[EXT_CLOCK_INPUT].isConnected()) {
+			/**
+			 * External clock, Stuff within block called when triggered.
+			 * Avoid going to next index when trigger button/output is held.
+			 */
+			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !triggerHeld) {
+				setIndex(index + 1);
+				trigIn = true;
 			}
+			gateIn = clockTrigger.isHigh();
 		}
+
 
 		// Reset
 		if (resetTrigger.process(params[RESET_PARAM].getValue() + inputs[RESET_INPUT].getVoltage())) {
 			setIndex(0);
 		}
-
-
 
 		// randomize values based on params if triggered
 		if (trigIn) {
@@ -183,12 +183,12 @@ struct ChanceSeq : Module {
 			// std::cout << "\n";
 		}
 
+		// Outputs
 		for (int i = 0; i < 16; i++) {
-			outputs[TRIGGER_OUTPUT + i].setVoltage((running && trigIn && i == index) ? 10.f : 0.f);
+			outputs[TRIGGER_OUTPUT + i].setVoltage((trigIn && i == index) ? 10.f : 0.f);
 			lights[TRIGGER_LIGHTS + i].setSmoothBrightness((i == index) ? 1.f : 0.f, args.sampleTime);
 		}
 
-		// Outputs
 		outputs[ROW1_OUTPUT].setVoltage(params[ROW1_PARAM + index].getValue() + pitchShift[0]);
 		outputs[ROW1_GATE_OUTPUT].setVoltage((gateIn && coinFlip[0]) ? 10.f : 0.f);
 		outputs[ROW1_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[0]) ? 10.f : 0.f);
@@ -205,7 +205,6 @@ struct ChanceSeq : Module {
 		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && coinFlip[3]) ? 10.f : 0.f);
 		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[3]) ? 10.f : 0.f);
 
-		lights[RUNNING_LIGHT].value = (running);
 		lights[RESET_LIGHT].setSmoothBrightness(resetTrigger.isHigh(), args.sampleTime);
 		lights[GATES_LIGHT].setSmoothBrightness(gateIn, args.sampleTime);
 	}
@@ -218,17 +217,18 @@ struct ChanceSeqWidget : ModuleWidget {
 
 		static const float portX[16] = {20, 70, 120, 170, 220, 270, 320, 370, 420, 470, 520, 570, 620, 670, 720, 770};
 
-		addParam(createParam<LEDButton>(Vec(portX[1], 47 - 1), module, ChanceSeq::RUN_PARAM));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[2], 50.4f), module, ChanceSeq::RUNNING_LIGHT));
-		addParam(createParam<LEDButton>(Vec(portX[3], 47 - 1), module, ChanceSeq::RESET_PARAM));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(portX[4], 50.4f), module, ChanceSeq::RESET_LIGHT));
-		addParam(createParam<RoundBlackSnapKnob>(Vec(portX[5], 38), module, ChanceSeq::STEPS_PARAM));
+		addParam(createParam<LEDButton>(Vec(830, 47 - 1), module, ChanceSeq::RUN_PARAM));
+		addParam(createParam<LEDButton>(Vec(930, 47 - 1), module, ChanceSeq::RESET_PARAM));
+		addChild(createLight<MediumLight<BlueLight>>(Vec(960, 50.4f), module, ChanceSeq::RESET_LIGHT));
+		addParam(createParam<RoundBlackSnapKnob>(Vec(990, 38), module, ChanceSeq::STEPS_PARAM));
 
-		addInput(createInput<PJ301MPort>(Vec(portX[1] - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
-		addInput(createInput<PJ301MPort>(Vec(portX[2] - 1, 70), module, ChanceSeq::RESET_INPUT));
-		addInput(createInput<PJ301MPort>(Vec(portX[3] - 1, 70), module, ChanceSeq::STEPS_INPUT));
+		addInput(createInput<PJ301MPort>(Vec(830 - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
+		addInput(createInput<PJ301MPort>(Vec(880 - 1, 70), module, ChanceSeq::RESET_INPUT));
+		addInput(createInput<PJ301MPort>(Vec(930 - 1, 70), module, ChanceSeq::STEPS_INPUT));
 
 		for (int i = 0; i < 16; i++) {
+			addInput(createInput<PJ301MPort>(Vec(portX[i] + 1, 70), module, ChanceSeq::TRIGGER_INPUT + i));
+
 			addParam(createParam<ChanceGateKnob>(Vec(portX[i] + 12, 100), module, ChanceSeq::ROW1_CHANCE_GATE_PARAM + i));
 			addParam(createParam<ChancePitchKnob>(Vec(portX[i] + 28.5f, 115), module, ChanceSeq::ROW1_CHANCE_PITCH_PARAM + i));
 			addParam(createParam<PitchKnob>(Vec(portX[i] - 2, 120), module, ChanceSeq::ROW1_PARAM + i));
