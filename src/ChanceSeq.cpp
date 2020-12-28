@@ -6,7 +6,6 @@
 struct ChanceSeq : Module {
 	enum ParamIds {
 		RUN_PARAM,
-		RESET_PARAM,
 		STEPS_PARAM,
 		ENUMS(ROW1_PARAM, 16),
 		ENUMS(ROW2_PARAM, 16),
@@ -55,7 +54,6 @@ struct ChanceSeq : Module {
 	};
 
 	dsp::SchmittTrigger clockTrigger;
-	dsp::SchmittTrigger resetTrigger;
 	dsp::SchmittTrigger gateTriggers[16];
 	dsp::SchmittTrigger gateInputTriggers[16];
 	/** Phase of internal LFO */
@@ -77,7 +75,6 @@ struct ChanceSeq : Module {
 	ChanceSeq() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(RUN_PARAM, 0.f, 1.f, 0.f);
-		configParam(RESET_PARAM, 0.f, 1.f, 0.f);
 		configParam(STEPS_PARAM, 1.f, 16.f, 16.f);
 		for (int i = 0; i < 16; i++) {
 			configParam(ROW1_PARAM + i, 0.f, 10.f, 0.f);
@@ -169,11 +166,6 @@ struct ChanceSeq : Module {
 			gateIn = clockTrigger.isHigh();
 		}
 
-		// Reset
-		if (resetTrigger.process(params[RESET_PARAM].getValue() + inputs[RESET_INPUT].getVoltage())) {
-			setIndex(0);
-		}
-
 		// randomize values based on params if triggered
 		if (trigIn) {
 			coinFlip[0] = random::uniform() < params[ROW1_CHANCE_GATE_PARAM + index].getValue();
@@ -214,7 +206,6 @@ struct ChanceSeq : Module {
 		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && coinFlip[3]) ? 10.f : 0.f);
 		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[3]) ? 10.f : 0.f);
 
-		lights[RESET_LIGHT].setSmoothBrightness(resetTrigger.isHigh(), args.sampleTime);
 		lights[GATES_LIGHT].setSmoothBrightness(gateIn, args.sampleTime);
 	}
 };
@@ -227,12 +218,9 @@ struct ChanceSeqWidget : ModuleWidget {
 		static const float portX[16] = {20, 70, 120, 170, 220, 270, 320, 370, 420, 470, 520, 570, 620, 670, 720, 770};
 
 		addParam(createParam<LEDButton>(Vec(830, 47 - 1), module, ChanceSeq::RUN_PARAM));
-		addParam(createParam<LEDButton>(Vec(930, 47 - 1), module, ChanceSeq::RESET_PARAM));
-		addChild(createLight<MediumLight<BlueLight>>(Vec(960, 50.4f), module, ChanceSeq::RESET_LIGHT));
 		addParam(createParam<RoundBlackSnapKnob>(Vec(990, 38), module, ChanceSeq::STEPS_PARAM));
 
 		addInput(createInput<PJ301MPort>(Vec(830 - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
-		addInput(createInput<PJ301MPort>(Vec(880 - 1, 70), module, ChanceSeq::RESET_INPUT));
 		addInput(createInput<PJ301MPort>(Vec(930 - 1, 70), module, ChanceSeq::STEPS_INPUT));
 
 		for (int i = 0; i < 16; i++) {
