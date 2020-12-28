@@ -24,7 +24,6 @@ struct ChanceSeq : Module {
 	};
 	enum InputIds {
 		EXT_CLOCK_INPUT,
-		RESET_INPUT,
 		STEPS_INPUT,
 		ENUMS(TRIGGER_INPUT, 16),
 		NUM_INPUTS
@@ -46,7 +45,6 @@ struct ChanceSeq : Module {
 		NUM_OUTPUTS
 	};
 	enum LightIds {
-		RESET_LIGHT,
 		GATES_LIGHT,
 		ENUMS(ROW_LIGHTS, 4),
 		ENUMS(TRIGGER_LIGHTS, 16),
@@ -110,6 +108,43 @@ struct ChanceSeq : Module {
 	void dataFromJson(json_t* rootJ) override {
 	}
 
+	void setOutput(const ProcessArgs& args, bool gateIn, bool trigIn) {
+		for (int i = 0; i < 16; i++) {
+			outputs[TRIGGER_OUTPUT + i].setVoltage((trigIn && i == index) ? 10.f : 0.f);
+			lights[TRIGGER_LIGHTS + i].setSmoothBrightness((i == index) ? 1.f : 0.f, args.sampleTime);
+		}
+
+		outputs[ROW1_OUTPUT].setVoltage(params[ROW1_PARAM + index].getValue() + pitchShift[0]);
+		outputs[ROW1_GATE_OUTPUT].setVoltage((gateIn && coinFlip[0]) ? 10.f : 0.f);
+		outputs[ROW1_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[0]) ? 10.f : 0.f);
+
+		outputs[ROW2_OUTPUT].setVoltage(params[ROW2_PARAM + index].getValue() + pitchShift[1]);
+		outputs[ROW2_GATE_OUTPUT].setVoltage((gateIn && coinFlip[1]) ? 10.f : 0.f);
+		outputs[ROW2_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[1]) ? 10.f : 0.f);
+
+		outputs[ROW3_OUTPUT].setVoltage(params[ROW3_PARAM + index].getValue() + pitchShift[2]);
+		outputs[ROW3_GATE_OUTPUT].setVoltage((gateIn && coinFlip[2]) ? 10.f : 0.f);
+		outputs[ROW3_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[2]) ? 10.f : 0.f);
+
+		outputs[ROW4_OUTPUT].setVoltage(params[ROW4_PARAM + index].getValue() + pitchShift[3]);
+		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && coinFlip[3]) ? 10.f : 0.f);
+		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[3]) ? 10.f : 0.f);
+
+		lights[GATES_LIGHT].setSmoothBrightness(gateIn, args.sampleTime);
+	}
+
+	void setRandomValues() {
+		coinFlip[0] = random::uniform() < params[ROW1_CHANCE_GATE_PARAM + index].getValue();
+		coinFlip[1] = random::uniform() < params[ROW2_CHANCE_GATE_PARAM + index].getValue();
+		coinFlip[2] = random::uniform() < params[ROW3_CHANCE_GATE_PARAM + index].getValue();
+		coinFlip[3] = random::uniform() < params[ROW4_CHANCE_GATE_PARAM + index].getValue();
+
+		pitchShift[0] = random::uniform() * params[ROW1_CHANCE_PITCH_PARAM + index].getValue();
+		pitchShift[1] = random::uniform() * params[ROW2_CHANCE_PITCH_PARAM + index].getValue();
+		pitchShift[2] = random::uniform() * params[ROW3_CHANCE_PITCH_PARAM + index].getValue();
+		pitchShift[3] = random::uniform() * params[ROW4_CHANCE_PITCH_PARAM + index].getValue();
+	}
+
 	void setIndex(int index) {
 		int numSteps = (int) clamp(std::round(params[STEPS_PARAM].getValue() + inputs[STEPS_INPUT].getVoltage()), 1.f, 16.f);
 		phase = 0.f;
@@ -157,7 +192,7 @@ struct ChanceSeq : Module {
 		if (inputs[EXT_CLOCK_INPUT].isConnected()) {
 			/**
 			 * External clock, Stuff within block called when triggered.
-			 * Avoid going to next index when trigger button/output is held.
+			 * Avoid going to next index for two ticks after trigger button/output was held.
 			 */
 			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && releaseTimer.time > 1) {
 				setIndex(index + 1);
@@ -167,46 +202,10 @@ struct ChanceSeq : Module {
 		}
 
 		// randomize values based on params if triggered
-		if (trigIn) {
-			coinFlip[0] = random::uniform() < params[ROW1_CHANCE_GATE_PARAM + index].getValue();
-			coinFlip[1] = random::uniform() < params[ROW2_CHANCE_GATE_PARAM + index].getValue();
-			coinFlip[2] = random::uniform() < params[ROW3_CHANCE_GATE_PARAM + index].getValue();
-			coinFlip[3] = random::uniform() < params[ROW4_CHANCE_GATE_PARAM + index].getValue();
-			// std::cout << random::uniform();
-			// std::cout << "\n";
+		if (trigIn)
+			setRandomValues();
 
-			pitchShift[0] = random::uniform() * params[ROW1_CHANCE_PITCH_PARAM + index].getValue();
-			pitchShift[1] = random::uniform() * params[ROW2_CHANCE_PITCH_PARAM + index].getValue();
-			pitchShift[2] = random::uniform() * params[ROW3_CHANCE_PITCH_PARAM + index].getValue();
-			pitchShift[3] = random::uniform() * params[ROW4_CHANCE_PITCH_PARAM + index].getValue();
-
-			// std::cout << pitchShift[0];
-			// std::cout << "\n";
-		}
-
-		// Outputs
-		for (int i = 0; i < 16; i++) {
-			outputs[TRIGGER_OUTPUT + i].setVoltage((trigIn && i == index) ? 10.f : 0.f);
-			lights[TRIGGER_LIGHTS + i].setSmoothBrightness((i == index) ? 1.f : 0.f, args.sampleTime);
-		}
-
-		outputs[ROW1_OUTPUT].setVoltage(params[ROW1_PARAM + index].getValue() + pitchShift[0]);
-		outputs[ROW1_GATE_OUTPUT].setVoltage((gateIn && coinFlip[0]) ? 10.f : 0.f);
-		outputs[ROW1_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[0]) ? 10.f : 0.f);
-
-		outputs[ROW2_OUTPUT].setVoltage(params[ROW2_PARAM + index].getValue() + pitchShift[1]);
-		outputs[ROW2_GATE_OUTPUT].setVoltage((gateIn && coinFlip[1]) ? 10.f : 0.f);
-		outputs[ROW2_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[1]) ? 10.f : 0.f);
-
-		outputs[ROW3_OUTPUT].setVoltage(params[ROW3_PARAM + index].getValue() + pitchShift[2]);
-		outputs[ROW3_GATE_OUTPUT].setVoltage((gateIn && coinFlip[2]) ? 10.f : 0.f);
-		outputs[ROW3_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[2]) ? 10.f : 0.f);
-
-		outputs[ROW4_OUTPUT].setVoltage(params[ROW4_PARAM + index].getValue() + pitchShift[3]);
-		outputs[ROW4_GATE_OUTPUT].setVoltage((gateIn && coinFlip[3]) ? 10.f : 0.f);
-		outputs[ROW4_TRIGGER_OUTPUT].setVoltage((trigIn && coinFlip[3]) ? 10.f : 0.f);
-
-		lights[GATES_LIGHT].setSmoothBrightness(gateIn, args.sampleTime);
+		setOutput(args, gateIn, trigIn);
 	}
 };
 
