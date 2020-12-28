@@ -68,7 +68,10 @@ struct ChanceSeq : Module {
 	/** for change pitch knobs */
 	float pitchShift[4] = {0, 0, 0, 0};
 
-	bool triggerHeld[16];
+	/**
+	 * Time trigger buttons/inputs have not been held. This is reset every tick something is held.
+	 * Used to avoid sync issues with clock and trigger inputs/switches
+	 */
 	dsp::Timer releaseTimer;
 
 	ChanceSeq() {
@@ -118,72 +121,48 @@ struct ChanceSeq : Module {
 			this->index = 0;
 	}
 
-	bool allTriggersReleased() {
-		for (int i = 0; i < 16; i++) {
-			if (triggerHeld[i])
-				return false;
-		}
-		return true;
-	}
-
-	void resetReleaseClock() {
-		if (someTriggerHeld()) {
-			releaseTimer.reset();
-		}
-	}
-
-	bool someTriggerHeld() {
-		for (int i = 0; i < 16; i++) {
-			if (triggerHeld[i])
-				return true;
-		}
-		return false;
-	}
-
 	void process(const ProcessArgs& args) override {
-		releaseTimer.process(1);
+		if (releaseTimer.time < 100000) // Max out timer at 100 seconds to avoid overflow
+			releaseTimer.process(1);
+
 		bool gateIn = false;
 		bool trigIn = false;
+		bool triggerPressed = false;
 
 		// TRIGGER inputs
 		for (int i = 0; i < 16; i++) {
-			if (inputs[TRIGGER_INPUT + i].isConnected() && gateInputTriggers[i].process(inputs[TRIGGER_INPUT + i].getVoltage()))
-				trigIn = true;
-
-			// If value is different from the one before then trigger
-			if (inputs[TRIGGER_INPUT + i].getVoltage() > 0.f) {
-				if (index != i)
+			if (inputs[TRIGGER_INPUT + i].isConnected()) {
+				if (gateInputTriggers[i].process(inputs[TRIGGER_INPUT + i].getVoltage()))
 					trigIn = true;
 
-				setIndex(i);
-				triggerHeld[i] = true;
-			} else {
-				triggerHeld[i] = false;
+				if (inputs[TRIGGER_INPUT + i].getVoltage() > 0.f) {
+					setIndex(i);
+					triggerPressed = true;
+				}
 			}
 		}
-		resetReleaseClock();
 
-		std::cout << releaseTimer.time;
-		std::cout << "\n";
+		// TRIGGER buttons
+		for (int i = 0; i < 16; i++) {
+			if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
+				trigIn = true;
 
-		// // TRIGGER buttons
-		// for (int i = 0; i < 16; i++) {
-		// 	// trigger if a button is pressed
-		// 	if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
-		// 		trigIn = true;
+			if (params[TRIGGER_PARAM + i].getValue() == 1) {
+				setIndex(i);
+				triggerPressed = true;
+			}
+		}
 
-		// 	if (params[TRIGGER_PARAM + i].getValue() == 1) {
-		// 		setIndex(i);
-		// 		triggerHeld = true;
-		// 	}
-		// }
+		if (triggerPressed)
+			releaseTimer.reset();
+
 
 		if (inputs[EXT_CLOCK_INPUT].isConnected()) {
 			/**
 			 * External clock, Stuff within block called when triggered.
 			 * Avoid going to next index when trigger button/output is held.
 			 */
-			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !someTriggerHeld() && releaseTimer.time > 1) {
+			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && releaseTimer.time > 1) {
 				setIndex(index + 1);
 				trigIn = true;
 			}
