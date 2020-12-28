@@ -68,6 +68,9 @@ struct ChanceSeq : Module {
 	/** for change pitch knobs */
 	float pitchShift[4] = {0, 0, 0, 0};
 
+	bool triggerHeld[16];
+	dsp::Timer releaseTimer;
+
 	ChanceSeq() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
 		configParam(RUN_PARAM, 0.f, 1.f, 0.f);
@@ -115,10 +118,32 @@ struct ChanceSeq : Module {
 			this->index = 0;
 	}
 
+	bool allTriggersReleased() {
+		for (int i = 0; i < 16; i++) {
+			if (triggerHeld[i])
+				return false;
+		}
+		return true;
+	}
+
+	void resetReleaseClock() {
+		if (someTriggerHeld()) {
+			releaseTimer.reset();
+		}
+	}
+
+	bool someTriggerHeld() {
+		for (int i = 0; i < 16; i++) {
+			if (triggerHeld[i])
+				return true;
+		}
+		return false;
+	}
+
 	void process(const ProcessArgs& args) override {
+		releaseTimer.process(1);
 		bool gateIn = false;
 		bool trigIn = false;
-		bool triggerHeld = false;
 
 		// TRIGGER inputs
 		for (int i = 0; i < 16; i++) {
@@ -131,34 +156,39 @@ struct ChanceSeq : Module {
 					trigIn = true;
 
 				setIndex(i);
-				triggerHeld = true;
+				triggerHeld[i] = true;
+			} else {
+				triggerHeld[i] = false;
 			}
 		}
+		resetReleaseClock();
 
-		// TRIGGER buttons
-		for (int i = 0; i < 16; i++) {
-			// trigger if a button is pressed
-			if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
-				trigIn = true;
+		std::cout << releaseTimer.time;
+		std::cout << "\n";
 
-			if (params[TRIGGER_PARAM + i].getValue() == 1) {
-				setIndex(i);
-				triggerHeld = true;
-			}
-		}
+		// // TRIGGER buttons
+		// for (int i = 0; i < 16; i++) {
+		// 	// trigger if a button is pressed
+		// 	if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
+		// 		trigIn = true;
+
+		// 	if (params[TRIGGER_PARAM + i].getValue() == 1) {
+		// 		setIndex(i);
+		// 		triggerHeld = true;
+		// 	}
+		// }
 
 		if (inputs[EXT_CLOCK_INPUT].isConnected()) {
 			/**
 			 * External clock, Stuff within block called when triggered.
 			 * Avoid going to next index when trigger button/output is held.
 			 */
-			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !triggerHeld) {
+			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && !someTriggerHeld() && releaseTimer.time > 1) {
 				setIndex(index + 1);
 				trigIn = true;
 			}
 			gateIn = clockTrigger.isHigh();
 		}
-
 
 		// Reset
 		if (resetTrigger.process(params[RESET_PARAM].getValue() + inputs[RESET_INPUT].getVoltage())) {
