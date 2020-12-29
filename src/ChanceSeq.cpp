@@ -5,8 +5,6 @@
 
 struct ChanceSeq : Module {
 	enum ParamIds {
-		RUN_PARAM,
-		STEPS_PARAM,
 		ENUMS(ROW1_PARAM, 16),
 		ENUMS(ROW2_PARAM, 16),
 		ENUMS(ROW3_PARAM, 16),
@@ -25,7 +23,6 @@ struct ChanceSeq : Module {
 	};
 	enum InputIds {
 		EXT_CLOCK_INPUT,
-		STEPS_INPUT,
 		ENUMS(TRIGGER_INPUT, 16),
 		NUM_INPUTS
 	};
@@ -73,8 +70,6 @@ struct ChanceSeq : Module {
 
 	ChanceSeq() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		configParam(RUN_PARAM, 0.f, 1.f, 0.f);
-		configParam(STEPS_PARAM, 1.f, 16.f, 16.f);
 		for (int i = 0; i < 16; i++) {
 			configParam(ROW1_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW2_PARAM + i, 0.f, 10.f, 0.f);
@@ -148,7 +143,7 @@ struct ChanceSeq : Module {
 	}
 
 	void setIndex(int index) {
-		int numSteps = (int) clamp(std::round(params[STEPS_PARAM].getValue() + inputs[STEPS_INPUT].getVoltage()), 1.f, 16.f);
+		int numSteps = 16;
 		phase = 0.f;
 		this->index = index;
 		if (this->index >= numSteps)
@@ -159,6 +154,20 @@ struct ChanceSeq : Module {
 		int nextStep = index == 15 ? 0 : index + 1;
 
 		return params[STEP_MODE_PARAM + nextStep].getValue() == 2.f;
+	}
+
+	int nextClockStep() {
+		for (int i = index + 1; i < 16; i++) {
+			if (params[STEP_MODE_PARAM + i].getValue() != 0.f)
+				return i;
+		}
+
+		for (int i = 0; i < 16 - index; i++) {
+			if (params[STEP_MODE_PARAM + i].getValue() != 0.f) {
+				return i;
+			}
+		}
+		return 0;
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -203,7 +212,7 @@ struct ChanceSeq : Module {
 			 * Avoid going to next index for two ticks after trigger button/output was held.
 			 */
 			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && releaseTimer.time > 1 && !isPauseStep()) {
-				setIndex(index + 1);
+				setIndex(nextClockStep());
 				trigIn = true;
 			}
 			gateIn = clockTrigger.isHigh();
@@ -224,12 +233,7 @@ struct ChanceSeqWidget : ModuleWidget {
 
 		static const float portX[16] = {20, 70, 120, 170, 220, 270, 320, 370, 420, 470, 520, 570, 620, 670, 720, 770};
 
-		addParam(createParam<LEDButton>(Vec(830, 47 - 1), module, ChanceSeq::RUN_PARAM));
-		addParam(createParam<RoundBlackSnapKnob>(Vec(990, 38), module, ChanceSeq::STEPS_PARAM));
-
 		addInput(createInput<PJ301MPort>(Vec(830 - 1, 70), module, ChanceSeq::EXT_CLOCK_INPUT));
-		addInput(createInput<PJ301MPort>(Vec(930 - 1, 70), module, ChanceSeq::STEPS_INPUT));
-
 		for (int i = 0; i < 16; i++) {
 			addParam(createParam<NKK>(Vec(portX[i] - 1, 20), module, ChanceSeq::STEP_MODE_PARAM + i));
 
@@ -271,8 +275,6 @@ struct ChanceSeqWidget : ModuleWidget {
 		addOutput(createOutput<PJ301MPort>(Vec(830, 270), module, ChanceSeq::ROW4_OUTPUT));
 		addOutput(createOutput<PJ301MPort>(Vec(880, 270), module, ChanceSeq::ROW4_GATE_OUTPUT));
 		addOutput(createOutput<PJ301MPort>(Vec(930, 270), module, ChanceSeq::ROW4_TRIGGER_OUTPUT));
-
-		// addOutput(createOutput(<PJ301MPort>(oi)))
 	}
 };
 
