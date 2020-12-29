@@ -4,26 +4,28 @@
 
 
 struct ChanceSeq : Module {
+	const static int numSteps = 16;
+
 	enum ParamIds {
-		ENUMS(ROW1_PARAM, 16),
-		ENUMS(ROW2_PARAM, 16),
-		ENUMS(ROW3_PARAM, 16),
-		ENUMS(ROW4_PARAM, 16),
-		ENUMS(ROW1_CHANCE_GATE_PARAM, 16),
-		ENUMS(ROW2_CHANCE_GATE_PARAM, 16),
-		ENUMS(ROW3_CHANCE_GATE_PARAM, 16),
-		ENUMS(ROW4_CHANCE_GATE_PARAM, 16),
-		ENUMS(ROW1_CHANCE_PITCH_PARAM, 16),
-		ENUMS(ROW2_CHANCE_PITCH_PARAM, 16),
-		ENUMS(ROW3_CHANCE_PITCH_PARAM, 16),
-		ENUMS(ROW4_CHANCE_PITCH_PARAM, 16),
-		ENUMS(TRIGGER_PARAM, 16),
-		ENUMS(STEP_MODE_PARAM, 16),
+		ENUMS(ROW1_PARAM, numSteps),
+		ENUMS(ROW2_PARAM, numSteps),
+		ENUMS(ROW3_PARAM, numSteps),
+		ENUMS(ROW4_PARAM, numSteps),
+		ENUMS(ROW1_CHANCE_GATE_PARAM, numSteps),
+		ENUMS(ROW2_CHANCE_GATE_PARAM, numSteps),
+		ENUMS(ROW3_CHANCE_GATE_PARAM, numSteps),
+		ENUMS(ROW4_CHANCE_GATE_PARAM, numSteps),
+		ENUMS(ROW1_CHANCE_PITCH_PARAM, numSteps),
+		ENUMS(ROW2_CHANCE_PITCH_PARAM, numSteps),
+		ENUMS(ROW3_CHANCE_PITCH_PARAM, numSteps),
+		ENUMS(ROW4_CHANCE_PITCH_PARAM, numSteps),
+		ENUMS(TRIGGER_PARAM, numSteps),
+		ENUMS(STEP_MODE_PARAM, numSteps),
 		NUM_PARAMS
 	};
 	enum InputIds {
 		EXT_CLOCK_INPUT,
-		ENUMS(TRIGGER_INPUT, 16),
+		ENUMS(TRIGGER_INPUT, numSteps),
 		NUM_INPUTS
 	};
 	enum OutputIds {
@@ -39,19 +41,19 @@ struct ChanceSeq : Module {
 		ROW2_TRIGGER_OUTPUT,
 		ROW3_TRIGGER_OUTPUT,
 		ROW4_TRIGGER_OUTPUT,
-		ENUMS(TRIGGER_OUTPUT, 16),
+		ENUMS(TRIGGER_OUTPUT, numSteps),
 		NUM_OUTPUTS
 	};
 	enum LightIds {
 		GATES_LIGHT,
 		ENUMS(ROW_LIGHTS, 4),
-		ENUMS(TRIGGER_LIGHTS, 16),
+		ENUMS(TRIGGER_LIGHTS, numSteps),
 		NUM_LIGHTS
 	};
 
 	dsp::SchmittTrigger clockTrigger;
-	dsp::SchmittTrigger gateTriggers[16];
-	dsp::SchmittTrigger gateInputTriggers[16];
+	dsp::SchmittTrigger gateTriggers[numSteps];
+	dsp::SchmittTrigger gateInputTriggers[numSteps];
 	/** Phase of internal LFO */
 	float phase = 0.f;
 	int index = 0;
@@ -70,7 +72,7 @@ struct ChanceSeq : Module {
 
 	ChanceSeq() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < numSteps; i++) {
 			configParam(ROW1_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW2_PARAM + i, 0.f, 10.f, 0.f);
 			configParam(ROW3_PARAM + i, 0.f, 10.f, 0.f);
@@ -106,7 +108,7 @@ struct ChanceSeq : Module {
 	}
 
 	void setOutput(const ProcessArgs& args, bool gateIn, bool trigIn) {
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < numSteps; i++) {
 			outputs[TRIGGER_OUTPUT + i].setVoltage((trigIn && i == index) ? 10.f : 0.f);
 			lights[TRIGGER_LIGHTS + i].setSmoothBrightness((i == index) ? 1.f : 0.f, args.sampleTime);
 		}
@@ -143,7 +145,6 @@ struct ChanceSeq : Module {
 	}
 
 	void setIndex(int index) {
-		int numSteps = 16;
 		phase = 0.f;
 		this->index = index;
 		if (this->index >= numSteps)
@@ -151,13 +152,13 @@ struct ChanceSeq : Module {
 	}
 
 	bool isPauseStep() {
-		int nextStep = index == 15 ? 0 : index + 1;
+		int nextStep = index == numSteps - 1 ? 0 : index + 1;
 
 		return params[STEP_MODE_PARAM + nextStep].getValue() == 2.f;
 	}
 
 	int nextClockStep() {
-		for (int i = index + 1; i < 16; i++) {
+		for (int i = index + 1; i < numSteps; i++) {
 			if (params[STEP_MODE_PARAM + i].getValue() != 0.f)
 				return i;
 		}
@@ -179,7 +180,7 @@ struct ChanceSeq : Module {
 		bool triggerPressed = false;
 
 		// TRIGGER inputs
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < numSteps; i++) {
 			if (inputs[TRIGGER_INPUT + i].isConnected()) {
 				if (gateInputTriggers[i].process(inputs[TRIGGER_INPUT + i].getVoltage()))
 					trigIn = true;
@@ -192,7 +193,7 @@ struct ChanceSeq : Module {
 		}
 
 		// TRIGGER buttons
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < numSteps; i++) {
 			if (gateTriggers[i].process(params[TRIGGER_PARAM + i].getValue()))
 				trigIn = true;
 
