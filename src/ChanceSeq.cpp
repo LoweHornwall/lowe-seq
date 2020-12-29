@@ -20,6 +20,7 @@ struct ChanceSeq : Module {
 		ENUMS(ROW3_CHANCE_PITCH_PARAM, 16),
 		ENUMS(ROW4_CHANCE_PITCH_PARAM, 16),
 		ENUMS(TRIGGER_PARAM, 16),
+		ENUMS(STEP_MODE_PARAM, 16),
 		NUM_PARAMS
 	};
 	enum InputIds {
@@ -88,6 +89,7 @@ struct ChanceSeq : Module {
 			configParam(ROW3_CHANCE_PITCH_PARAM + i, -1.f, 1.f, 0.f);
 			configParam(ROW4_CHANCE_PITCH_PARAM + i, -1.f, 1.f, 0.f);
 			configParam(TRIGGER_PARAM + i, 0.f, 1.f, 0.f);
+			configParam(STEP_MODE_PARAM + i, 0.f, 2.f, 1.f);
 		}
 
 		onReset();
@@ -153,6 +155,12 @@ struct ChanceSeq : Module {
 			this->index = 0;
 	}
 
+	bool isPauseStep() {
+		int nextStep = index == 15 ? 0 : index + 1;
+
+		return params[STEP_MODE_PARAM + nextStep].getValue() == 2.f;
+	}
+
 	void process(const ProcessArgs& args) override {
 		if (releaseTimer.time < 100000) // Max out timer at 100 seconds to avoid overflow
 			releaseTimer.process(1);
@@ -194,7 +202,7 @@ struct ChanceSeq : Module {
 			 * External clock, Stuff within block called when triggered.
 			 * Avoid going to next index for two ticks after trigger button/output was held.
 			 */
-			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && releaseTimer.time > 1) {
+			if (clockTrigger.process(inputs[EXT_CLOCK_INPUT].getVoltage()) && releaseTimer.time > 1 && !isPauseStep()) {
 				setIndex(index + 1);
 				trigIn = true;
 			}
@@ -223,6 +231,8 @@ struct ChanceSeqWidget : ModuleWidget {
 		addInput(createInput<PJ301MPort>(Vec(930 - 1, 70), module, ChanceSeq::STEPS_INPUT));
 
 		for (int i = 0; i < 16; i++) {
+			addParam(createParam<NKK>(Vec(portX[i] - 1, 20), module, ChanceSeq::STEP_MODE_PARAM + i));
+
 			addInput(createInput<PJ301MPort>(Vec(portX[i] + 1, 70), module, ChanceSeq::TRIGGER_INPUT + i));
 
 			addParam(createParam<ChanceGateKnob>(Vec(portX[i] + 12, 100), module, ChanceSeq::ROW1_CHANCE_GATE_PARAM + i));
