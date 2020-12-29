@@ -162,7 +162,7 @@ struct ChanceSeq : Module {
 				return i;
 		}
 
-		for (int i = 0; i < 16 - index; i++) {
+		for (int i = 0; i < index + 1; i++) {
 			if (params[STEP_MODE_PARAM + i].getValue() != 0.f) {
 				return i;
 			}
