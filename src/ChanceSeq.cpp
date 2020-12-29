@@ -57,10 +57,10 @@ struct ChanceSeq : Module {
 	int index = 0;
 
 	/** for chance gate knobs */
-	bool coinFlip[4] = {false, false, false, false};
+	bool coinFlip[4];
 
 	/** for change pitch knobs */
-	float pitchShift[4] = {0, 0, 0, 0};
+	float pitchShift[4];
 
 	/**
 	 * Time trigger buttons/inputs have not been held. This is reset every tick something is held.
